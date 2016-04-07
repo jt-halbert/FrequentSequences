@@ -9,6 +9,11 @@ type SequenceDBRow
     items::Vector{Item} #items in the event
 end
 
+type Atom
+    sequence::Sequence
+    idlist::Vector{Tuple{Id,Id}}
+end
+
 typealias SequenceDB Vector{SequenceDBRow}
 
 function prepareSampleDB(filename)
@@ -54,18 +59,15 @@ end
 function potentialFreq2seqs(ts::Vector{Tuple{Item,Id}},frequentitems::Set{Item})
     s = Set{Sequence}()
     for i=1:length(ts), j=1:length(ts)
-        if i!=j
-            if in(ts[i][1],frequentitems) && in(ts[j][1],frequentitems)
-                if ts[i][1]!=ts[j][1] # exclude same item
-                    if ts[i][2] <= ts[j][2] # only consider subsequent-in-time pairs
-                        if ts[i][2]==ts[j][2]  # same event
-                            # N.B. we assume lexographical order on items within event
-                            push!(s,Vector[sort([ts[i][1],ts[j][1]])])
-                        else
-                            push!(s,Vector[[ts[i][1]],[ts[j][1]]])
-                        end
-                    end
-                end
+        if i!=j &&
+            in(ts[i][1],frequentitems) && in(ts[j][1],frequentitems) &&
+            ts[i][1]!=ts[j][1] && # exclude same item
+            ts[i][2] <= ts[j][2]  # only consider subsequent-in-time pairs
+            if ts[i][2]==ts[j][2]  # same event
+                # N.B. we assume lexicographical order on items within event
+                push!(s,Vector[sort([ts[i][1],ts[j][1]])])
+            else
+                push!(s,Vector[[ts[i][1]],[ts[j][1]]])
             end
         end
     end
@@ -83,3 +85,43 @@ function frequent2sequences(sequencedb::SequenceDB, frequentitems::Set{Item} , m
     filter((k,v)-> v>min_sup, frequencies)
 end
 
+function possiblepairs(seq1::Sequence, seq2::Sequence)
+    # this assummes each is just a singleton for now
+    a = seq1[1][1]
+    b = seq2[1][1]
+    return Vector[[a,b]],Vector[[a],[b]],Vector[[b],[a]]
+end
+
+
+a = Atom(Vector[['A']], idlists['A'])
+d = Atom(Vector[['D']], idlists['D'])
+out = Dict{Sequence,Vector{Tuple{Id,Id}}}()
+
+for (s1,e1) in a.idlist, (s2,e2) in d.idlist
+    if s1==s2 && e1==e2 && !in((s2,e2),get(out,Vector[sort(['A','B'])],[]))
+        out[Vector[sort(['A','D'])]] = push!(get(out,Vector[sort(['A','D'])],[]), (s2,e2))
+    end
+    if s1==s2 && e1<e2 && !in((s2,e2),get(out,Vector[['A'],['D']],[]))
+        out[Vector[['A'],['D']]] = push!(get(out,Vector[['A'],['D']],[]), (s2,e2))
+    end
+    if s1==s2 && e2<e1 && !in((s1,e1),get(out,Vector[['D'],['A']],[]))
+        out[Vector[['D'],['A']]] = push!(get(out,Vector[['D'],['A']],[]), (s1,e1))
+    end
+end
+
+function joinpairs(seq1::Sequence, seq2::Sequence)
+    out = Dict{Sequence,Vector{Tuple{Id,Id}}}()
+    # case event, event
+    if length(seq1) == length(seq2) == 1
+        p=seq1[1][1]
+        a=seq1[1][2]
+        b=seq2[1][2]
+        
+    end
+    # case event, sequence
+    if length(seq1)==1 && length(seq2)==2
+        
+    end
+    # case sequence, sequence
+    if length(seq1) == length(seq2) == 2
+        
